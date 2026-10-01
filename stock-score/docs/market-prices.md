@@ -1,0 +1,19 @@
+# Etapa de precios: preparada, sin programar
+
+La función `market-prices` es una etapa nueva y separada de la función antigua `pipeline-refresh`. Lee Alpaca por lotes de hasta 12 símbolos, sigue todos los `next_page_token`, usa IEX y `adjustment=split`, conserva sesiones en `ops.price_bars` y reanuda por `ops.source_watermarks`. El día 1 de cada mes vuelve a descargar el histórico ajustado, de modo que un split no mezcle precios históricos con unidades de acciones distintas. Solo usa sesiones cerradas antes del día UTC actual y se ejecuta desde las 04:00 UTC.
+
+**Estado:** el código y el SQL están preparados en esta rama. Ni la tabla, ni la función nueva, ni el cron se han aplicado al proyecto Supabase. Una lectura conectada de Alpaca confirmó **92 de 92** cierres IEX del 30/09/2026 para las empresas actualmente aptas. La revisión automática bloqueó su escritura masiva porque la propuesta original anulaba métricas históricas; esos precios no se han guardado. Sigue habiendo cero pertenencias verificadas a índices y cero scores publicados.
+
+## Activación en orden
+
+1. Revisar el DDL de `supabase/sql/price-bars.review.sql`, generar una migración real con Supabase CLI y aplicar primero en un entorno de prueba. `ops` no se expone por la Data API; la tabla tiene RLS y no concede acceso a `anon` ni `authenticated`.
+2. Configurar en secretos de la Edge Function `SUPABASE_DB_URL` (conexión privada y privilegios mínimos suficientes), `ALPACA_API_KEY_ID`, `ALPACA_API_SECRET_KEY` y un `PIPELINE_JOB_SECRET` **nuevo** y aleatorio de al menos 32 caracteres. Nunca usar la clave publicable ni una clave de cliente para este último secreto.
+3. Desplegar `market-prices` con `verify_jwt = false` tal como indica `supabase/config.toml`. El handler valida por sí mismo `Authorization: Bearer <PIPELINE_JOB_SECRET>` y falla cerrado si falta el secreto. El cuerpo de la petición no acepta símbolos arbitrarios ni parámetros `force`.
+4. Ejecutar una sola invocación controlada, comprobar `ops.jobs`, las 12 sesiones y las fechas reales, comprobar ausencia de cabeceras o secretos en logs, y repetirla para verificar idempotencia. Simular 429, 5xx, respuesta incompleta y reinicio antes de programar.
+5. Solo después de la prueba y de revisar tamaño de tabla y permisos, guardar URL y token de invocación en Supabase Vault y programar con `pg_cron` + `pg_net`. Un ejemplo de horario para evaluar es cada diez minutos de 04:00 a 22:50 UTC, de martes a sábado. El cursor permite consumir hasta 12 empresas por invocación; la capacidad real debe medirse antes de cubrir todo el universo.
+
+Los datos proceden de **IEX**, una parte del mercado estadounidense: no son necesariamente el cierre consolidado SIP. La aplicación debe mostrar ese alcance si utiliza estos precios para una decisión. Los mínimos de 52 semanas y cinco años solo se publican cuando el historial ajustado cubre la ventana; las empresas recién cotizadas muestran `NULL`. Las ventanas de retorno requieren una sesión cercana al aniversario. Los scores se invalidan tras un precio nuevo hasta que el proceso financiero los recalcule; el pipeline de fundamentales y el universo oficial siguen pendientes.
+
+La tabla privada guarda como máximo aproximadamente cinco años y veinte días, con limpieza mensual. Las peticiones diarias son incrementales y agrupan símbolos; el primer backfill y la revisión de splits son más costosos. Supervisar los 500 MB del plan gratuito, el tiempo de ejecución y las cuotas de la cuenta Alpaca. No se compra ningún plan.
+
+Fuentes: [Alpaca barras multisímbolo y paginación](https://docs.alpaca.markets/us/v1.1/reference/stockbars), [feeds históricos IEX/SIP](https://docs.alpaca.markets/us/docs/historical-stock-data-1), [Supabase: autorización de funciones](https://supabase.com/docs/guides/functions/auth), [programación y Vault](https://supabase.com/docs/guides/functions/schedule-functions).

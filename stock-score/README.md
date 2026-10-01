@@ -13,6 +13,7 @@ Frontend de análisis fundamental en español, preparado para añadirse como car
 - Lectura masiva de `public.v_stock_score_v1` con caché de una hora. Portada y metodología generadas estáticamente con ISR; fichas generadas bajo demanda.
 - Revalidación protegida después de un pipeline y reintentos limitados ante 429 / 5xx / fallos de red.
 - Módulo financiero con las once fórmulas solicitadas, probado con pérdidas, patrimonio no positivo, deuda desconocida y efectivo neto.
+- Etapa de precios Alpaca por lotes versionada en `supabase/functions/market-prices/`, pendiente de migración, secretos, prueba en entorno aislado y programación. Véase [estado y activación](docs/market-prices.md).
 
 ## Ejecutar
 

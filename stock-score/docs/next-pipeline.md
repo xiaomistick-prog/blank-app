@@ -1,6 +1,6 @@
 # Siguiente fase: suministro de datos y programación
 
-El frontend está integrado con la vista real. La siguiente fase debe completar y verificar los datos antes de publicar un ranking utilizable. Este documento es una especificación pendiente; no declara tareas activadas.
+El frontend está integrado con la vista real. La etapa de precios Alpaca está implementada en código y documentada en [market-prices.md](market-prices.md), pero no aplicada ni programada en Supabase. Las demás fases deben completar y verificar los datos antes de publicar un ranking utilizable.
 
 ## Orden de implementación
 
